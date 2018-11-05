@@ -148,58 +148,73 @@ Pub ExtensionDemo | extend
   ExtTime:= 4                   'Extend for 4 s
   
   repeat
-    idle:= True
+    idle:= True                        'Play demo lights until extension starts
     rgb.AllOff  
     pst.str(string("Enter 1 to extend: "))
     extend:=pst.GetDec #>0 <#1         'Output the 0 or 1 to the H-Bridge chip's direction pin
     idle:= False
     if extend == 1
-      outa[EDir]~~                        'Set Extension motor direction outward
-      EDutyCycle:=100                   'Set Extension motor's duty cycle ** Probably want this to slow down based on encoder position
-                                       'as it nears the gear
-      repeat until contact == True     'Extend until arm at contact position ** Set by encoder position and hall effect/limit switch
-        'waitcnt(clkfreq*(ExtTime)+cnt) 'Replace this with Hall effect detection or limit switch setting "contact" variable
-        if ina[FrontLimit] == 1
+      outa[EDir]~~                      'Set Extension motor direction outward
+      EDutyCycle:=100                   'Set Extension motor's duty cycle ** Probably want this to slow down based on encoder position as it nears the gear 
+                                        
+      repeat until contact == True      'Extend until arm at contact position 
+        'waitcnt(clkfreq*(ExtTime)+cnt) 
+        if ina[FrontLimit] == 1         'Check for high signal by making contact with iimt switch
           contact:=True
           
+      contact:=False                    'Reset limit Switch
       EDutyCycle~~                      'Turn off extension motor
       pst.NewLine
       pst.str(string("Contact!"))
       
-    Flipping:=True                   'Start running ManualControl Method
+    Flipping:=True                   'Start running ManualControl Light method
     waitcnt(cnt+clkfreq)             'Pause for motor to stop
     
     outa[HDir]~~                       'Set hourglass rotation                 
     HDutyCycle:=100                   'Set Hourglass motor duty cycle
 
-    if HGPosition < 512
-      target := HGPosition + 512
+    if HGPosition < 512                'Ideally, this is absolute.  Checks whether position is greater than the absolute position associated w/ vertical hourglass
+      target := HGPosition + 512       'Sets target position to be 512 AKA 1/2 roation away from its current position
+      pst.NewLine
+      pst.str(string("target: "))
+      pst.dec(target)
+
     if HGPosition > 512
       target := HGPosition - 512
       pst.NewLine
       pst.str(string("target: "))
       pst.dec(target)
-                      
+
+    repeat until HGPosition => target           'Move until encoder reads that position has exceeded target position (if rotating clockwise)
+      HGposition:= Encoder(HCLK, HCS, HSI)      'Get Hourglass position from encoder
+      if ||(HGPosition - target) > 0       
+        pst.NewLine
+        pst.str(string("HGPosition: "))
+        pst.dec(HGPosition)  
+   {                   
     repeat until ||(HGPosition - target) <2  'Encoder postion of hourglass is target --> 180 degrees different  
       HGposition:= Encoder(HCLK, HCS, HSI)          'Get Hourglass position from encoder
       if ||(HGPosition - target) > 0
         pst.NewLine
         pst.str(string("HGPosition: "))
-        pst.dec(HGPosition)  
-    Flipping := False                     'Stop Running Manual Control method
+        pst.dec(HGPosition)   }
+    HDutyCycle~                        'Again, may want to slow down as near target
+                
+    Flipping := False                   'Stop Running ManualControl Light method   
     pst.NewLine                  
     pst.str(string("Flipped!"))
-    StartTime := True                  'Start Running Second Hand method
-    HDutyCycle~                        'Again, may want to slow down as near target
+    StartTime := True                  'Start Running SecondHand light method
+   
               
     Outa[EDir]~                        'Set Extension motor direction inward      
     EDutyCycle:=100                     'Set Extension motor's duty cycle ** Probably want this to slow down based on encoder position
                                        'as it nears the gear
-    repeat until retract == True       'Extend until arm at retract position ** Set by encoder position and hall effect/limit switch
-      'waitcnt(clkfreq*(ExtTime)+cnt)   'Replace this with Hall effect detection or limit switch setting "contact" variable
-      if ina[BackLimit] == 1
+    repeat until retract == True       'Extend until arm at retract position ** Set by encoder position and limit switch
+      'waitcnt(clkfreq*(ExtTime)+cnt)  
+      if ina[BackLimit] == 1           'Check for contact with limit switch
         retract:=True
-           
+    retract:=False
+         
     EDutyCycle~                        'Turn off extension motor  
     pst.NewLine                  
     pst.str(string("Done!"))
@@ -207,12 +222,58 @@ Pub ExtensionDemo | extend
     retract:= False
     Extend:=False                                   
     waitcnt(clkfreq+cnt)
-
-
   
 
     
+PUB CenterMotion          long ArmDir, ArmDutyCycle, ArmPosition, ArmTarget, ArmZero  'These should become global vars 
+                                                                                      'ArmZero may have to be an array of the vertical hourglass zero psitions    
+ repeat
 
+    pst.str(string("Enter 1 to rotate: "))
+    extend:=pst.GetDec #>0 <#1         'Output the 0 or 1 to the H-Bridge chip's direction pin
+    idle:= False
+
+                                        'Call this code every 5 minutes
+                                        
+    if rotate == 1                      'Check whether rotation protocol has been started.
+      outa[EDir]~~                      'Set Extension motor direction outward
+      ArmDutyCycle:=100                   'Set Extension motor's duty cycle ** Probably want this to slow down based on encoder position as it nears the gear 
+
+      ArmTarget:=ArmZero + 1023/12               'Set target 360/12 degrees of rotation away from current position
+                                                 'Aboslute reference by using ArmZero
+      repeat until ArmPosition => ArmTarget      'Extend until arm at contact position 
+        'waitcnt(clkfreq*(ExtTime)+cnt) 
+        if Encoder
+          
+      contact:=False                    'Reset limit Switch
+      EDutyCycle~~                      'Turn off extension motor
+      pst.NewLine
+      pst.str(string("Contact!"))
+      
+    Flipping:=True                   'Start running ManualControl Light method
+    waitcnt(cnt+clkfreq)             'Pause for motor to stop
+    
+    outa[HDir]~~                       'Set hourglass rotation                 
+    HDutyCycle:=100                   'Set Hourglass motor duty cycle
+
+    if HGPosition < 512                'Ideally, this is absolute.  Checks whether position is greater than the absolute position associated w/ vertical hourglass
+      target := HGPosition + 512       'Sets target position to be 512 AKA 1/2 roation away from its current position
+      pst.NewLine
+      pst.str(string("target: "))
+      pst.dec(target)
+
+    if HGPosition > 512
+      target := HGPosition - 512
+      pst.NewLine
+      pst.str(string("target: "))
+      pst.dec(target)
+
+    repeat until HGPosition => target           'Move until encoder reads that position has exceeded target position (if rotating clockwise)
+      HGposition:= Encoder(HCLK, HCS, HSI)      'Get Hourglass position from encoder
+      if ||(HGPosition - target) > 0       
+        pst.NewLine
+        pst.str(string("HGPosition: "))
+        pst.dec(HGPosition)  
 
 
 PUB Encoder(CLK, CS, SI) : PosData
